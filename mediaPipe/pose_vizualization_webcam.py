@@ -3,16 +3,24 @@ import mediapipe as mp
 
 def draw_landmarks_on_image(rgb_image, pose_results):
     annotated_image = rgb_image.copy()
-    if pose_results.pose_landmarks:
-        mp.solutions.drawing_utils.draw_landmarks(
-            annotated_image,
-            pose_results.pose_landmarks,
-            mp.solutions.pose.POSE_CONNECTIONS)
+
+    # Custom drawing specs for landmarks and connections
+    landmark_drawing_spec = mp.solutions.drawing_utils.DrawingSpec( color=(83, 88, 93), thickness=8, circle_radius=10 )
+    connection_drawing_spec = mp.solutions.drawing_utils.DrawingSpec( color=(255, 88, 0), thickness=8, circle_radius=10 )
+
+    mp.solutions.drawing_utils.draw_landmarks(
+        annotated_image,
+        pose_results.pose_landmarks,
+        mp.solutions.pose.POSE_CONNECTIONS,
+        landmark_drawing_spec,
+        connection_drawing_spec)
     return annotated_image
+
+
 
 # Initialize MediaPipe Pose.
 mp_pose = mp.solutions.pose
-pose = mp_pose.Pose()
+pose = mp_pose.Pose( model_complexity=2 )  # Use 2 for heavy, 1 for full, and 0 for light
 
 # Start capturing video input from the camera.
 cap = cv2.VideoCapture(0)  # '0' is typically the default camera.
@@ -28,10 +36,10 @@ while cap.isOpened():
         break
 
     # Convert the frame from BGR to RGB.
-    image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    image_rgb = cv2.cvtColor( frame, cv2.COLOR_BGR2RGB )
 
     # Process the image and detect pose landmarks.
-    pose_results = pose.process(image_rgb)
+    pose_results = pose.process( image_rgb )
 
     # Draw landmarks on the original frame.
     annotated_image = draw_landmarks_on_image(frame, pose_results)

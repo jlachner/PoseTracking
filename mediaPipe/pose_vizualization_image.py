@@ -4,15 +4,23 @@ import numpy as np
 
 def draw_landmarks_on_image( rgb_image, detection_result ):
     annotated_image = np.copy( rgb_image )
-    if detection_result.pose_landmarks:
-        mp.solutions.drawing_utils.draw_landmarks(
-            annotated_image,
-            detection_result.pose_landmarks,
-            mp.solutions.pose.POSE_CONNECTIONS)
+    
+    # Custom drawing specs for landmarks and connections
+    landmark_drawing_spec = mp.solutions.drawing_utils.DrawingSpec( color=(83, 88, 93), thickness=8, circle_radius=10 )
+    connection_drawing_spec = mp.solutions.drawing_utils.DrawingSpec( color=(255, 88, 0), thickness=8, circle_radius=10 )
+
+    mp.solutions.drawing_utils.draw_landmarks(
+        annotated_image,
+        pose_results.pose_landmarks,
+        mp.solutions.pose.POSE_CONNECTIONS,
+        landmark_drawing_spec,
+        connection_drawing_spec)
     return annotated_image
 
+
+
 # Load the input image from an image file.
-image_path = '/Users/johanneslachner/Documents/GIT_private/PoseTracking/images/1_raw.png' 
+image_path = '/Users/johanneslachner/Documents/GIT_private/PoseTracking/images/IMG_7246.png' 
 
 # Load the image using OpenCV.
 image_bgr = cv2.imread( image_path )
@@ -33,7 +41,7 @@ image_rgb = cv2.cvtColor( image_bgr, cv2.COLOR_BGR2RGB )
 
 # MediaPipe pose processing
 mp_pose = mp.solutions.pose
-pose = mp_pose.Pose()
+pose = mp_pose.Pose( model_complexity=2 )  # Use 2 for heavy, 1 for full, and 0 for light
 
 # Detect pose landmarks from the input image
 # MediaPipe expects RGB

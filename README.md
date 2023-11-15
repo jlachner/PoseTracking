@@ -1,8 +1,9 @@
 ## PoseTracking
 
 Author: Johannes Lachner
+Date: November 2023
 
 # Description
-Algorithms for pose tracking, using Sonyn RX0II and Media Pipe
+Algorithms for pose tracking, using Media Pipe.
 Documentation: https://github.com/googlesamples/mediapipe/blob/main/examples/pose_landmarker/python/
 
