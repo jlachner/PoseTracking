@@ -20,7 +20,7 @@ def draw_landmarks_on_image( rgb_image, detection_result ):
 
 
 # Load the input image from an image file.
-image_path = '/Users/johanneslachner/Documents/GIT_private/PoseTracking/images/IMG_7246.png' 
+image_path = '/Users/johanneslachner/Documents/GIT_private/PoseTracking/images/2_raw_annotated.jpg' 
 
 # Load the image using OpenCV.
 image_bgr = cv2.imread( image_path )
@@ -49,6 +49,11 @@ pose_results = pose.process( image_rgb )
 
 # Annotate original image and visualize it
 annotated_image = draw_landmarks_on_image( image_rgb, pose_results )
+
+# Save the annotated image
+cv2.imwrite( image_path, cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR) )
+
+# Show annotated image
 cv2.imshow('Annotated Image', cv2.cvtColor( annotated_image, cv2.COLOR_RGB2BGR ) )
 cv2.waitKey(0)
 cv2.destroyAllWindows()
