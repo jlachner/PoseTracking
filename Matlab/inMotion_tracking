@@ -1,0 +1,64 @@
+import os
+import matlab.engine
+import matplotlib.pyplot as plt
+
+# Define the folder structure
+base_folder = "/Users/johanneslachner/Documents/InMotion_Tracking/Input"
+subject = "subject1"
+condition = "constraint"
+
+# Start MATLAB engine
+eng = matlab.engine.start_matlab()
+
+# Initialize plot
+plt.figure()
+
+# Construct the file path for the specific condition of the subject
+subject_folder = os.path.join(base_folder, subject, "InMotion")
+mat_file = os.path.join(subject_folder, f"{condition}.mat")
+if os.path.isfile(mat_file):
+    try:
+        # Load the .mat file in MATLAB workspace and assign to a variable to suppress output
+        eng.eval(f"data = load('{mat_file}')", nargout=0)
+        
+        # Check if the variables exist in the MATLAB workspace
+        if 'posX_m' in eng.eval("fieldnames(data)"):
+            posX = eng.eval("data.posX_m", nargout=1)
+        else:
+            print(f"Variable 'posX_m' not found in {mat_file}")
+            posX = []
+
+        if 'posY_m' in eng.eval("fieldnames(data)"):
+            posY = eng.eval("data.posY_m", nargout=1)
+        else:
+            print(f"Variable 'posY_m' not found in {mat_file}")
+            posY = []
+
+        if posX and posY:
+            # Convert MATLAB arrays to Python lists
+            posX = [float(x) for x in posX]
+            posY = [float(y) for y in posY]
+
+            # Debugging: Print the first few values of posX and posY
+            print(f"First 5 values of posX: {posX[:5]}")
+            print(f"First 5 values of posY: {posY[:5]}")
+
+            # Plot the data
+            plt.plot(posX, posY, color='r', linestyle='-', linewidth=2, label=f"{subject}_{condition}")
+        else:
+            print(f"No data to plot for {subject} - {condition}")
+
+    except Exception as e:
+        print(f"Error processing file {mat_file}: {e}")
+else:
+    print(f"File does not exist: {mat_file}")
+
+# Configure plot
+plt.xlabel("posX_m")
+plt.ylabel("posY_m")
+plt.title("2D Path for Subject 1 - Constraint Condition")
+plt.legend(loc="best")
+plt.show()
+
+# Stop MATLAB engine
+eng.quit()

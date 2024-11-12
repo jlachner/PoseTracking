@@ -64,13 +64,53 @@ retval, cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T, E, F = cv2
     criteria=criteria, flags=cv2.CALIB_FIX_INTRINSIC
 )
 
-# Print or save the rotation (R) and translation (T) matrices
-print("Rotation Matrix:\n", R)
-print("Translation Vector:\n", T)
+# Print rotation and translation matrices
+print("Rotation Matrix (R):\n", R)
+print("Translation Vector (T):\n", T)
 
-# Optionally, save the extrinsic parameters for later use
+# Save the extrinsic parameters
 np.savez('extrinsic_params.npz', R=R, T=T, E=E, F=F)
 
-# Cleanup
+# Stereo Rectification
+R1, R2, P1, P2, Q, _, _ = cv2.stereoRectify(
+    mtx1, dist1, mtx2, dist2, gray1.shape[::-1], R, T, alpha=1
+)
+np.savez('stereo_rectify_params.npz', R1=R1, R2=R2, P1=P1, P2=P2, Q=Q)
+
+# Display rectified images (Optional, for verification)
+map1_x, map1_y = cv2.initUndistortRectifyMap(mtx1, dist1, R1, P1, gray1.shape[::-1], cv2.CV_32FC1)
+map2_x, map2_y = cv2.initUndistortRectifyMap(mtx2, dist2, R2, P2, gray2.shape[::-1], cv2.CV_32FC1)
+
+cap1 = cv2.VideoCapture(input_video_path_1)
+cap2 = cv2.VideoCapture(input_video_path_2)
+
+while True:
+    ret1, frame1 = cap1.read()
+    ret2, frame2 = cap2.read()
+    
+    if not ret1 or not ret2:
+        break
+    
+    rectified1 = cv2.remap(frame1, map1_x, map1_y, cv2.INTER_LINEAR)
+    rectified2 = cv2.remap(frame2, map2_x, map2_y, cv2.INTER_LINEAR)
+
+    cv2.imshow('Rectified Camera 1', rectified1)
+    cv2.imshow('Rectified Camera 2', rectified2)
+    
+    # Press ‘q’ to close the rectified video windows
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
 cap1.release()
 cap2.release()
+cv2.destroyAllWindows()
+
+# Verification: Calculate and print reprojection error
+total_error = 0
+for i in range(len(objpoints)):
+    imgpoints1_proj, _ = cv2.projectPoints(objpoints[i], R, T, mtx1, dist1)
+    imgpoints2_proj, _ = cv2.projectPoints(objpoints[i], np.eye(3), np.zeros((3, 1)), mtx2, dist2)
+    error1 = cv2.norm(imgpoints1[i], imgpoints1_proj, cv2.NORM_L2) / len(imgpoints1_proj)
+    error2 = cv2.norm(imgpoints2[i], imgpoints2_proj, cv2.NORM_L2) / len(imgpoints2_proj)
+    total_error += error1 + error2
+print("Reprojection Error:", total_error / len(objpoints)) # Goal: reprojection error < 0.5 pixels

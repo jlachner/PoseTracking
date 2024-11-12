@@ -2,24 +2,44 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
-def draw_landmarks_on_image(rgb_image, pose_results):
+def draw_right_arm_landmarks(rgb_image, pose_results):
     annotated_image = np.copy(rgb_image)
     
-    # Custom drawing specs for landmarks and connections
+    # Initialize drawing specs
     landmark_drawing_spec = mp.solutions.drawing_utils.DrawingSpec(color=(83, 88, 93), thickness=8, circle_radius=10)
-    connection_drawing_spec = mp.solutions.drawing_utils.DrawingSpec(color=(255, 88, 0), thickness=8, circle_radius=10)
-
-    mp.solutions.drawing_utils.draw_landmarks(
-        annotated_image,
-        pose_results.pose_landmarks,
-        mp.solutions.pose.POSE_CONNECTIONS,
-        landmark_drawing_spec,
-        connection_drawing_spec)
+    #connection_drawing_spec = mp.solutions.drawing_utils.DrawingSpec(color=(0,191,255), thickness=8, circle_radius=10) #blue
+    connection_drawing_spec = mp.solutions.drawing_utils.DrawingSpec(color=(255, 88, 0), thickness=8, circle_radius=10) #orange
+    
+    # Right arm connections based on MediaPipe Pose landmark numbering
+    right_arm_connections = [
+        (12, 14),  # Right shoulder to right elbow
+        (14, 16),  # Right elbow to right wrist
+    ]
+    
+    if pose_results.pose_landmarks:
+        # Draw each connection
+        for connection in right_arm_connections:
+            start_idx, end_idx = connection
+            start_landmark = pose_results.pose_landmarks.landmark[start_idx]
+            end_landmark = pose_results.pose_landmarks.landmark[end_idx]
+            cv2.line(annotated_image, 
+                     (int(start_landmark.x * annotated_image.shape[1]), int(start_landmark.y * annotated_image.shape[0])), 
+                     (int(end_landmark.x * annotated_image.shape[1]), int(end_landmark.y * annotated_image.shape[0])), 
+                     connection_drawing_spec.color, connection_drawing_spec.thickness)
+        
+        # Draw each landmark
+        for idx in [11, 12, 14, 16]:  # Right shoulder, elbow, and wrist
+            landmark = pose_results.pose_landmarks.landmark[idx]
+            cv2.circle(annotated_image, 
+                       (int(landmark.x * annotated_image.shape[1]), int(landmark.y * annotated_image.shape[0])), 
+                       landmark_drawing_spec.circle_radius, landmark_drawing_spec.color, landmark_drawing_spec.thickness)
+    
     return annotated_image
 
+
 # File paths
-input_video_path = '/Users/johanneslachner/Documents/GIT_private/PoseTracking/images/2_raw.mp4'  # Update this path to your video path
-output_video_path = '/Users/johanneslachner/Documents/GIT_private/PoseTracking/images/2_annotated.mp4'  # Change to AVI format
+input_video_path = '/Users/johanneslachner/Documents/GIT_private/PoseTracking/videos/noConst_1.mp4'  # Update this path to your video path
+output_video_path = '/Users/johanneslachner/Documents/GIT_private/PoseTracking/videos/noConst_1_annotated_ra.mp4'  # Change to AVI format
 
 
 # Initialize MediaPipe Pose.
@@ -48,7 +68,7 @@ while cap.isOpened():
     pose_results = pose.process(image_rgb)
 
     # Draw the pose annotation on the frame
-    annotated_image = draw_landmarks_on_image(image_rgb, pose_results)
+    annotated_image = draw_right_arm_landmarks(image_rgb, pose_results)
 
     # Convert back to BGR for displaying and writing
     annotated_image_bgr = cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR)
