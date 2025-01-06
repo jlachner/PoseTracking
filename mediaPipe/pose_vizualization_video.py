@@ -38,8 +38,8 @@ def draw_right_arm_landmarks(rgb_image, pose_results):
 
 
 # File paths
-input_video_path = '/Users/johanneslachner/Documents/GIT_private/PoseTracking/videos/noConst_1.mp4'  # Update this path to your video path
-output_video_path = '/Users/johanneslachner/Documents/GIT_private/PoseTracking/videos/noConst_1_annotated_ra.mp4'  # Change to AVI format
+input_video_path = '/Users/johanneslachner/Documents/InMotion_Tracking/Input/test/constraint/constraint2.mp4'  # Update this path to your video path
+output_video_path = '/Users/johanneslachner/Documents/InMotion_Tracking/Output/test/constraint/constraint2_annotated.mp4'  # Change to AVI format
 
 
 # Initialize MediaPipe Pose.
