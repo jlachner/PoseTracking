@@ -1,3 +1,5 @@
+# Ignore:
+*.mat
 .DS_Store
 images
 *.mp4
