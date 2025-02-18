@@ -2,7 +2,7 @@
 clear; close all; clc;
 
 %% Load subject data (update the filename accordingly)
-subject = 's2';
+subject = 's1';
 load( [ 'Matlab_data/', subject ,'.mat'] ); % Change 's1' to your actual subject file
 
 % Ensure subjectData exists
