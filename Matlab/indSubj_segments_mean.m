@@ -2,7 +2,7 @@
 clear; close all; clc;
 
 %% Load subject data (update the filename accordingly)
-load('Matlab_data/s1.mat'); % Change 's1' to your actual subject file
+load('Matlab_data/s3.mat'); % Change 's1' to your actual subject file
 
 % Ensure subjectData exists
 if ~exist('subjectData', 'var')
@@ -27,55 +27,37 @@ radius_threshold = 0.004; % 4 mm radius
 % Determine Global Axis Limits
 [x_min, x_max, y_min, y_max] = get_global_axis_limits(subjectData, key_points, conditions, arms);
 
-% Plot Figure 1: Trials 3,5,7 (Original Order)
-plot_mean_trajectory([3, 5, 7], [1, 2, 3, 4, 5, 6, 7], 'Trials 3, 5, 7 - Mean Trajectory', ...
-                     subjectData, key_points, key_labels, conditions, condition_labels, arms, colors, radius_threshold, x_min, x_max, y_min, y_max);
+% Calculate Mean Trajectories
+segment_means = calculate_segment_means([3, 5, 7], [1, 2, 3, 4, 5, 6, 7], subjectData, key_points, conditions, arms, radius_threshold);
+plot_mean_trajectory(segment_means, 'Trials 3, 5, 7 - Mean Trajectory', key_points, key_labels, conditions, condition_labels, arms, colors, x_min, x_max, y_min, y_max);
 
-% Plot Figure 2: Trials 2,4,6 (Reversed Order)
-plot_mean_trajectory([2, 4, 6], [1, 7, 6, 5, 4, 3, 2], 'Trials 2, 4, 6 - Mean Trajectory', ...
-                     subjectData, key_points, key_labels, conditions, condition_labels, arms, colors, radius_threshold, x_min, x_max, y_min, y_max);
-
+segment_means = calculate_segment_means([2, 4, 6], [1, 7, 6, 5, 4, 3, 2], subjectData, key_points, conditions, arms, radius_threshold);
+plot_mean_trajectory(segment_means, 'Trials 2, 4, 6 - Mean Trajectory', key_points, key_labels, conditions, condition_labels, arms, colors, x_min, x_max, y_min, y_max);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ------------------------- FUNCTION DEFINITIONS -------------------------
 
-
-% Plot only the mean trajectory
-function plot_mean_trajectory(trials, movement_order, fig_title, subjectData, key_points, key_labels, conditions, condition_labels, arms, colors, radius_threshold, x_min, x_max, y_min, y_max)
-    figure;
-    tiledlayout(2,2);
-    sgtitle(fig_title, 'FontSize', 14, 'FontWeight', 'bold');
-
+% Function to calculate segment means
+function segment_means = calculate_segment_means(trials, movement_order, subjectData, key_points, conditions, arms, radius_threshold)
+    segment_means = struct();
+    
     for c = 1:length(conditions)
         condition = conditions{c};
-        nexttile;
-        hold on;
-        title(condition_labels{c}, 'FontSize', 12, 'FontWeight', 'bold');
-        xlabel('X [m]', 'FontSize', 10);
-        ylabel('Y [m]', 'FontSize', 10);
-        xlim([x_min, x_max]);  % **Set uniform X-axis limits**
-        ylim([y_min, y_max]);  % **Set uniform Y-axis limits**
-
-        legend_entries = {}; % Store legend entries
-
         for a = 1:length(arms)
             arm = arms{a};
-            isFirstPlot = true; % Track first plot for legend
-            segment_means_X = cell(length(movement_order)-1, 1);
-            segment_means_Y = cell(length(movement_order)-1, 1);
+            segment_means.(condition).(arm).X = cell(length(movement_order)-1, 1);
+            segment_means.(condition).(arm).Y = cell(length(movement_order)-1, 1);
 
             % Collect segment trajectories across trials
             for trial = trials
                 if isfield(subjectData, condition) && isfield(subjectData.(condition), arm) ...
                         && length(subjectData.(condition).(arm)) >= trial
-
+                    
                     data = subjectData.(condition).(arm){trial};
-
                     if isfield(data, 'posX_m') && isfield(data, 'posY_m')
-                        % Get position data
                         posX = data.posX_m;
                         posY = data.posY_m;
-
+                        
                         % Find last position within the start radius before movement begins
                         distances_start = sqrt((posX - key_points(1,1)).^2 + (posY - key_points(1,2)).^2);
                         valid_start_idx = find(distances_start <= radius_threshold, 1, 'last');
@@ -89,51 +71,70 @@ function plot_mean_trajectory(trials, movement_order, fig_title, subjectData, ke
                             start_idx = movement_order(seg);
                             end_idx = movement_order(seg+1);
 
-                            % Find last position at start of segment
                             dist_from_start = sqrt((posX - key_points(start_idx,1)).^2 + (posY - key_points(start_idx,2)).^2);
                             last_idx_start = find(dist_from_start <= radius_threshold, 1, 'last');
-
-                            % Find first position at end of segment
+                            
                             dist_from_end = sqrt((posX - key_points(end_idx,1)).^2 + (posY - key_points(end_idx,2)).^2);
                             first_idx_end = find(dist_from_end <= radius_threshold, 1, 'first');
 
                             if ~isempty(last_idx_start) && ~isempty(first_idx_end) && last_idx_start < first_idx_end
-                                segmentX = posX(last_idx_start:first_idx_end);
-                                segmentY = posY(last_idx_start:first_idx_end);
-
-                                % Store segment data
-                                segment_means_X{seg} = [segment_means_X{seg}; interp1(1:length(segmentX), segmentX, linspace(1, length(segmentX), 100))];
-                                segment_means_Y{seg} = [segment_means_Y{seg}; interp1(1:length(segmentY), segmentY, linspace(1, length(segmentY), 100))];
+                                segmentX = interp1(1:length(posX(last_idx_start:first_idx_end)), posX(last_idx_start:first_idx_end), linspace(1, length(posX(last_idx_start:first_idx_end)), 100));
+                                segmentY = interp1(1:length(posY(last_idx_start:first_idx_end)), posY(last_idx_start:first_idx_end), linspace(1, length(posY(last_idx_start:first_idx_end)), 100));
+                                
+                                segment_means.(condition).(arm).X{seg} = [segment_means.(condition).(arm).X{seg}; segmentX(:)'];
+                                segment_means.(condition).(arm).Y{seg} = [segment_means.(condition).(arm).Y{seg}; segmentY(:)'];
                             end
                         end
                     end
                 end
             end
+        end
+    end
+end
 
-            % Compute and plot mean trajectory for each segment
-            for seg = 1:length(segment_means_X)
-                if ~isempty(segment_means_X{seg}) && ~isempty(segment_means_Y{seg})
-                    meanX = mean(segment_means_X{seg}, 1);
-                    meanY = mean(segment_means_Y{seg}, 1);
 
+% Function to plot mean trajectories
+function plot_mean_trajectory(segment_means, fig_title, key_points, key_labels, conditions, condition_labels, arms, colors, x_min, x_max, y_min, y_max)
+    figure;
+    tiledlayout(2,2);
+    sgtitle(fig_title, 'FontSize', 14, 'FontWeight', 'bold');
+    
+    for c = 1:length(conditions)
+        condition = conditions{c};
+        nexttile;
+        hold on;
+        title(condition_labels{c}, 'FontSize', 12, 'FontWeight', 'bold');
+        xlabel('X [m]', 'FontSize', 10);
+        ylabel('Y [m]', 'FontSize', 10);
+        xlim([x_min, x_max]);
+        ylim([y_min, y_max]);
+        legend_entries = {};
+        
+        for a = 1:length(arms)
+            arm = arms{a};
+            isFirstPlot = true; % Ensure only one legend entry per arm
+            for seg = 1:length(segment_means.(condition).(arm).X)
+                if ~isempty(segment_means.(condition).(arm).X{seg})
+                    meanX = mean(segment_means.(condition).(arm).X{seg}, 1);
+                    meanY = mean(segment_means.(condition).(arm).Y{seg}, 1);
+                    
                     if isFirstPlot
                         plot(meanX, meanY, 'Color', colors{a}, 'LineWidth', 2.5, 'DisplayName', [upper(arm) ' Arm']);
+                        legend_entries{end+1} = [upper(arm) ' Arm'];
                         isFirstPlot = false;
                     else
                         plot(meanX, meanY, 'Color', colors{a}, 'LineWidth', 2.5, 'HandleVisibility', 'off');
                     end
                 end
             end
-
-            legend_entries{end+1} = [upper(arm) ' Arm'];
         end
-
-        % **Plot Key Points**
+        
+        % Plot key points after the trajectories
         for k = 1:size(key_points, 1)
-            plot(key_points(k,1), key_points(k,2), 'ko', 'MarkerSize', 12, 'LineWidth', 3, 'MarkerFaceColor', 'k', 'HandleVisibility', 'off');
-            text(key_points(k,1) + 0.01, key_points(k,2) + 0.015, key_labels{k}, 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'k');
+            plot(key_points(k,1), key_points(k,2), 'ko', 'MarkerSize', 8, 'LineWidth', 2, 'MarkerFaceColor', 'k');
+            text(key_points(k,1) + 0.005, key_points(k,2) + 0.005, key_labels{k}, 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'k');
         end
-
+        
         legend(legend_entries);
         hold off;
     end
