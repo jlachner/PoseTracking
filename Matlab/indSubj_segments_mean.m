@@ -2,7 +2,7 @@
 clear; close all; clc;
 
 %% Load subject data (update the filename accordingly)
-load('Matlab_data/s3.mat'); % Change 's1' to your actual subject file
+load('Matlab_data/s2.mat'); % Change 's1' to your actual subject file
 
 % Ensure subjectData exists
 if ~exist('subjectData', 'var')
@@ -30,9 +30,12 @@ radius_threshold = 0.004; % 4 mm radius
 % Calculate Mean Trajectories
 segment_means = calculate_segment_means([3, 5, 7], [1, 2, 3, 4, 5, 6, 7], subjectData, key_points, conditions, arms, radius_threshold);
 plot_mean_trajectory(segment_means, 'Trials 3, 5, 7 - Mean Trajectory', key_points, key_labels, conditions, condition_labels, arms, colors, x_min, x_max, y_min, y_max);
+plot_max_velocity(segment_means, 'Trials 3, 5, 7 - Max Velocity', conditions, condition_labels, arms, colors);
+
 
 segment_means = calculate_segment_means([2, 4, 6], [1, 7, 6, 5, 4, 3, 2], subjectData, key_points, conditions, arms, radius_threshold);
 plot_mean_trajectory(segment_means, 'Trials 2, 4, 6 - Mean Trajectory', key_points, key_labels, conditions, condition_labels, arms, colors, x_min, x_max, y_min, y_max);
+plot_max_velocity(segment_means, 'Trials 2, 4, 6 - Max Velocity', conditions, condition_labels, arms, colors);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ------------------------- FUNCTION DEFINITIONS -------------------------
@@ -45,29 +48,40 @@ function segment_means = calculate_segment_means(trials, movement_order, subject
         condition = conditions{c};
         for a = 1:length(arms)
             arm = arms{a};
-            segment_means.(condition).(arm).X = cell(length(movement_order)-1, 1);
-            segment_means.(condition).(arm).Y = cell(length(movement_order)-1, 1);
+            num_segments = length(movement_order) - 1;
+            segment_means.(condition).(arm).X = cell(num_segments, 1);
+            segment_means.(condition).(arm).Y = cell(num_segments, 1);
+            segment_means.(condition).(arm).MaxVel = nan(num_segments, 1); % Store max velocity per segment
 
-            % Collect segment trajectories across trials
-            for trial = trials
-                if isfield(subjectData, condition) && isfield(subjectData.(condition), arm) ...
-                        && length(subjectData.(condition).(arm)) >= trial
-                    
-                    data = subjectData.(condition).(arm){trial};
-                    if isfield(data, 'posX_m') && isfield(data, 'posY_m')
-                        posX = data.posX_m;
-                        posY = data.posY_m;
+            for seg = 1:num_segments
+                all_segmentX = [];
+                all_segmentY = [];
+                all_max_vel = [];
+
+                for trial = trials
+                    if isfield(subjectData, condition) && isfield(subjectData.(condition), arm) ...
+                            && length(subjectData.(condition).(arm)) >= trial
                         
-                        % Find last position within the start radius before movement begins
-                        distances_start = sqrt((posX - key_points(1,1)).^2 + (posY - key_points(1,2)).^2);
-                        valid_start_idx = find(distances_start <= radius_threshold, 1, 'last');
-                        if ~isempty(valid_start_idx)
-                            posX = posX(valid_start_idx:end);
-                            posY = posY(valid_start_idx:end);
-                        end
+                        data = subjectData.(condition).(arm){trial};
+                        if isfield(data, 'posX_m') && isfield(data, 'posY_m') && isfield(data, 'velX_mps') && isfield(data, 'velY_mps')
+                            posX = data.posX_m;
+                            posY = data.posY_m;
+                            velX = data.velX_mps;
+                            velY = data.velY_mps;
+                            
+                            % Compute Euclidean velocity
+                            euclidean_velocity = sqrt(velX.^2 + velY.^2);
+                            
+                            % Find last position within the start radius before movement begins
+                            distances_start = sqrt((posX - key_points(1,1)).^2 + (posY - key_points(1,2)).^2);
+                            valid_start_idx = find(distances_start <= radius_threshold, 1, 'last');
+                            if ~isempty(valid_start_idx)
+                                posX = posX(valid_start_idx:end);
+                                posY = posY(valid_start_idx:end);
+                                euclidean_velocity = euclidean_velocity(valid_start_idx:end);
+                            end
 
-                        % Segment movements
-                        for seg = 1:length(movement_order)-1
+                            % Get start and end points for the segment
                             start_idx = movement_order(seg);
                             end_idx = movement_order(seg+1);
 
@@ -78,19 +92,29 @@ function segment_means = calculate_segment_means(trials, movement_order, subject
                             first_idx_end = find(dist_from_end <= radius_threshold, 1, 'first');
 
                             if ~isempty(last_idx_start) && ~isempty(first_idx_end) && last_idx_start < first_idx_end
-                                segmentX = interp1(1:length(posX(last_idx_start:first_idx_end)), posX(last_idx_start:first_idx_end), linspace(1, length(posX(last_idx_start:first_idx_end)), 100));
-                                segmentY = interp1(1:length(posY(last_idx_start:first_idx_end)), posY(last_idx_start:first_idx_end), linspace(1, length(posY(last_idx_start:first_idx_end)), 100));
-                                
-                                segment_means.(condition).(arm).X{seg} = [segment_means.(condition).(arm).X{seg}; segmentX(:)'];
-                                segment_means.(condition).(arm).Y{seg} = [segment_means.(condition).(arm).Y{seg}; segmentY(:)'];
+                                segmentX = posX(last_idx_start:first_idx_end);
+                                segmentY = posY(last_idx_start:first_idx_end);
+                                maxVel = max(euclidean_velocity(last_idx_start:first_idx_end));
+
+                                all_segmentX = [all_segmentX; interp1(1:length(segmentX), segmentX, linspace(1, length(segmentX), 100))];
+                                all_segmentY = [all_segmentY; interp1(1:length(segmentY), segmentY, linspace(1, length(segmentY), 100))];
+                                all_max_vel = [all_max_vel; maxVel];
                             end
                         end
                     end
+                end
+
+                % Store averaged results across trials
+                if ~isempty(all_segmentX)
+                    segment_means.(condition).(arm).X{seg} = mean(all_segmentX, 1);
+                    segment_means.(condition).(arm).Y{seg} = mean(all_segmentY, 1);
+                    segment_means.(condition).(arm).MaxVel(seg) = mean(all_max_vel);
                 end
             end
         end
     end
 end
+
 
 
 % Function to plot mean trajectories
@@ -136,6 +160,35 @@ function plot_mean_trajectory(segment_means, fig_title, key_points, key_labels, 
         end
         
         legend(legend_entries);
+        hold off;
+    end
+end
+
+
+% Function to plot max velocity across movement order
+function plot_max_velocity(segment_means, fig_title, conditions, condition_labels, arms, colors)
+    figure;
+    tiledlayout(2,2);
+    sgtitle(fig_title, 'FontSize', 14, 'FontWeight', 'bold');
+    
+    for c = 1:length(conditions)
+        condition = conditions{c};
+        nexttile;
+        hold on;
+        title(condition_labels{c}, 'FontSize', 12, 'FontWeight', 'bold');
+        xlabel('Movement Order', 'FontSize', 10);
+        ylabel('Max Velocity (m/s)', 'FontSize', 10);
+        
+        for a = 1:length(arms)
+            arm = arms{a};
+            vMax = segment_means.(condition).(arm).MaxVel;
+            
+            if ~isnan(vMax)
+                plot(1:length(vMax), vMax, '-o', 'Color', colors{a}, 'LineWidth', 2.5, 'MarkerSize', 6, 'DisplayName', [upper(arm) ' Arm']);
+            end
+        end
+        
+        legend;
         hold off;
     end
 end
